@@ -7,19 +7,12 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-
 CHROMEDRIVER_PATH = 'chromedriver' # assumes driver is in current working directory
 LOGIN_URL = 'https://login.gatech.edu/cas/login?service=https%3A%2F%2Fsso.sis.gatech.edu%3A443%2Fssomanager%2Fc%2FSSB'
 REGISTRATION_URL = 'https://oscar.gatech.edu/bprod/bwskfreg.P_AltPin' # will redirect to term selection if needed
-QUERY_URL = 'https://oscar.gatech.edu/bprod/bwckschd.p_disp_detail_sched' # then append term and crn params
+QUERY_URL = 'https://oscar.gatech.edu/bprod/bwckschd.p_disp_detail_sched?term_in={term:n}&crn_in={crn:n}' # use .format
 
-options = webdriver.ChromeOptions()
-sessionDriver = None # driver that will store cookies for logged in session
-anonDriver = None # driver that won't be logged in
-
-term_code = None
 term_dict = {'02': 'Spring', '05': 'Summer', '08': 'Fall'}
-params = '?term_in={term:n}&crn_in={crn:n}' # url extension
 auth_dict = {'push': 0, 'call': 1, 'pass': 2} # i know there are better ways
 
 # https://docs.python.org/3/library/argparse.html#the-add-argument-method
@@ -39,7 +32,6 @@ def keepActive():
 	else:
 		print('WARNING: trying to keep unknown page active')
 
-
 def register(crn, waitlist=True, field_index=0):
 	'''attempts to register for a specific course'''
 	# for i, crn in enumerate(sys.argv[1:], 1): # enumerate from index 1
@@ -47,29 +39,10 @@ def register(crn, waitlist=True, field_index=0):
 	sessionDriver.find_element_by_xpath("//form/input[19]").click() # submit changes
 	# TODO error handling (if full and/or waitlistable)
 
-def poll(crn):
-	'''checks for available seats and waitlist seats in a specific course'''
-	anonDriver.get(QUERY_URL + params.format(term_code, crn))
-	# TODO implement
-	return False
-	# return seats_rem > 0 and waitlist_rem < waitlist_cap # TODO logic here may be wrong?
-
-# while True:
-#     print("Checking waitlist...")
-#     for crn in crns:
-
-#         response = requests.get('https://oscar.gatech.edu/bprod/bwckschd.p_disp_detail_sched', params=(term, ('crn_in', crn)))
-#         waitlist_section = response.text[response.text.index("Seats"):response.text.index("Waitlist Seats")]
-#         if list(map(lambda x: int(x), re.findall("ddefault\">(\d)", waitlist_section)))[2] > 0:
-#             print(crn, 'slot available')
-#         else:
-#             print('fuck you')
-        
-#     time.sleep(3)
-
 def main():
 	args = parser.parse_args(sys.argv[1:]) # omit program name (sys.argv[0]) from args
 
+	options = webdriver.ChromeOptions()
 	options.add_argument('start-maximized' if args.show else 'headless')
 	anonDriver = webdriver.Chrome(CHROMEDRIVER_PATH, options=options)
 	anonDriver.implicitly_wait(3)
