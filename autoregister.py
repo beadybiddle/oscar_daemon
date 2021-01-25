@@ -3,9 +3,7 @@ import re
 import time
 import argparse
 from selenium import webdriver
-from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
 
 CHROMEDRIVER_PATH = 'chromedriver' # assumes driver is in current working directory
 LOGIN_URL = 'https://login.gatech.edu/cas/login?service=https%3A%2F%2Fsso.sis.gatech.edu%3A443%2Fssomanager%2Fc%2FSSB'
@@ -32,11 +30,10 @@ def keepActive():
 	else:
 		print('WARNING: trying to keep unknown page active')
 
-def register(crn, waitlist=True, field_index=0):
+def register(driver, crn, waitlist=True, field_index=0):
 	'''attempts to register for a specific course'''
 	# for i, crn in enumerate(sys.argv[1:], 1): # enumerate from index 1
-	sessionDriver.find_element_by_id('crn_id' + str(field_index + 1)).send_keys(crn) # add CRN
-	sessionDriver.find_element_by_xpath("//form/input[19]").click() # submit changes
+	
 	# TODO error handling (if full and/or waitlistable)
 
 def main():
@@ -60,7 +57,7 @@ def main():
 	print(args.authentication.capitalize(), 'authentication requested. Please verify login attempt.')
 	WebDriverWait(sessionDriver, timeout=30).until(lambda d: d.find_elements_by_name('StuWeb-MainMenuLink'))
 	print('Logged in.')
-
+	
 	if term_code := args.term: # if a term code was included as an argument from command line
 		sessionDriver.get(REGISTRATION_URL + '?term_in=' + term_code) # go straight to semester registration
 	else:
@@ -73,17 +70,25 @@ def main():
 				term_code = option.get_attribute('value')
 	print('Assuming term', term_dict[term_code[4:]], term_code[:4], '.')
 
-	poll(33724) # debug
+	sessionDriver.execute_script("window.open('about:blank');") # open new tab for querying
+	while True:
+		sessionDriver.switch_to_window(sessionDriver.window_handles[1]) # switch to second tab
+		for crn in args.crns:
+			# TODO handle when 2 crns must be reigstered simultaneously
+			sessionDriver.get(QUERY_URL.format(term_code, crn))
+			# read seats available
 
-	# while True:
-	# 	for crn in sys.argv[1:]:
-	# 		if poll(crn):
-	# 			print('Pretending to register for', crn)
+			if seats_rem > 0 or waitlist_rem > 0: # todo check this is how it's displayed
+				# TODO attempt to register
+				# switch tabs
+				sessionDriver.find_element_by_id('crn_id' + str(field_index + 1)).send_keys(crn) # add CRN
+				sessionDriver.find_element_by_xpath("//form/input[19]").click() # submit changes
+				# TODO check if registration worked, handle accordingly
 
-	# 	time.sleep(2)
+		time.sleep(2)
 
-	# sessionDriver.quit()
-	# anonDriver.quit()
+	sessionDriver.quit()
+	anonDriver.quit()
 
 
 if __name__ == '__main__':
