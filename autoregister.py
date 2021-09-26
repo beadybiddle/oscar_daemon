@@ -1,3 +1,5 @@
+### David Desrochers, 2021 ###
+
 import sys
 import re
 import time
@@ -25,8 +27,8 @@ parser.add_argument('-t', '--term', help='term code in the form YYYYSS with Spri
 
 
 def keepActive():
-	if 'https://oscar.gatech.edu/bprod/bwskfreg.P_AltPin' in sessionDriver.current_url: # registration page
-		sessionDriver.find_element_by_xpath("//form/input[21]").click() # reset (clear CRN fields)
+	if 'https://oscar.gatech.edu/bprod/bwskfreg.P_AltPin' in driver.current_url: # registration page
+		driver.find_element_by_xpath("//form/input[21]").click() # reset (clear CRN fields)
 	else:
 		print('WARNING: trying to keep unknown page active')
 
@@ -43,52 +45,53 @@ def main():
 	options.add_argument('start-maximized' if args.show else 'headless')
 	anonDriver = webdriver.Chrome(CHROMEDRIVER_PATH, options=options)
 	anonDriver.implicitly_wait(3)
-	sessionDriver = webdriver.Chrome(CHROMEDRIVER_PATH, options=options)
-	sessionDriver.implicitly_wait(3)
+	driver = webdriver.Chrome(CHROMEDRIVER_PATH, options=options)
+	driver.implicitly_wait(3)
 	
-	sessionDriver.get(LOGIN_URL)
-	sessionDriver.find_element_by_id('username').send_keys(args.username)
-	sessionDriver.find_element_by_id('password').send_keys(args.password)
-	sessionDriver.find_element_by_xpath('//*[@id="login"]/div[5]/input[4]').click()
-	sessionDriver.switch_to.frame(sessionDriver.find_element_by_id('duo_iframe'))
-	div_auth = sessionDriver.find_element_by_id("auth_methods")
+	driver.get(LOGIN_URL)
+	driver.find_element_by_id('username').send_keys(args.username)
+	driver.find_element_by_id('password').send_keys(args.password)
+	driver.find_element_by_xpath('//*[@id="login"]/div[5]/input[4]').click()
+	driver.switch_to.frame(driver.find_element_by_id('duo_iframe'))
+	div_auth = driver.find_element_by_id("auth_methods")
 	div_auth.find_elements_by_xpath('//button[@type=\'submit\']')[auth_dict[args.authentication]].click()
-	sessionDriver.switch_to.default_content()
+	driver.switch_to.default_content()
 	print(args.authentication.capitalize(), 'authentication requested. Please verify login attempt.')
-	WebDriverWait(sessionDriver, timeout=30).until(lambda d: d.find_elements_by_name('StuWeb-MainMenuLink'))
+	WebDriverWait(driver, timeout=30).until(lambda d: d.find_elements_by_name('StuWeb-MainMenuLink'))
 	print('Logged in.')
 	
 	if term_code := args.term: # if a term code was included as an argument from command line
-		sessionDriver.get(REGISTRATION_URL + '?term_in=' + term_code) # go straight to semester registration
+		driver.get(REGISTRATION_URL + '?term_in=' + term_code) # go straight to semester registration
 	else:
-		sessionDriver.get(REGISTRATION_URL)
-		combobox = sessionDriver.find_element_by_id('term_id')
+		driver.get(REGISTRATION_URL)
+		combobox = driver.find_element_by_id('term_id')
 		for option in combobox.find_elements_by_tag_name('option'): # traverse dropdown
 			if not ('View only' in option.text or 'Language' in option.text):
 				option.click() # select latest valid semester
-				sessionDriver.find_element_by_xpath('//form/input').click() # submit
+				driver.find_element_by_xpath('//form/input').click() # submit
 				term_code = option.get_attribute('value')
 	print('Assuming term', term_dict[term_code[4:]], term_code[:4], '.')
 
-	sessionDriver.execute_script("window.open('about:blank');") # open new tab for querying
+	driver.execute_script("window.open('');") # open new tab for querying
 	while True:
-		sessionDriver.switch_to_window(sessionDriver.window_handles[1]) # switch to second tab
+		driver.switch_to_window(driver.window_handles[1]) # switch to second tab
+		if driver.title is not '':
+			
 		for crn in args.crns:
 			# TODO handle when 2 crns must be reigstered simultaneously
-			sessionDriver.get(QUERY_URL.format(term_code, crn))
+			driver.get(QUERY_URL.format(term_code, crn))
 			# read seats available
 
 			if seats_rem > 0 or waitlist_rem > 0: # todo check this is how it's displayed
 				# TODO attempt to register
 				# switch tabs
-				sessionDriver.find_element_by_id('crn_id' + str(field_index + 1)).send_keys(crn) # add CRN
-				sessionDriver.find_element_by_xpath("//form/input[19]").click() # submit changes
+				driver.find_element_by_id('crn_id' + str(field_index + 1)).send_keys(crn) # add CRN
+				driver.find_element_by_xpath("//form/input[19]").click() # submit changes
 				# TODO check if registration worked, handle accordingly
 
 		time.sleep(2)
 
-	sessionDriver.quit()
-	anonDriver.quit()
+	driver.quit()
 
 
 if __name__ == '__main__':
