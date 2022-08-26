@@ -1,13 +1,10 @@
-### David Desrochers, 2021 ###
+### David Desrochers, 2022 ###
 
 import sys
-import re
 import time
 import argparse
-from selenium import webdriver
-from selenium.webdriver.support.ui import WebDriverWait
+import requests
 
-CHROMEDRIVER_PATH = 'chromedriver' # assumes driver is in current working directory
 LOGIN_URL = 'https://login.gatech.edu/cas/login?service=https%3A%2F%2Fsso.sis.gatech.edu%3A443%2Fssomanager%2Fc%2FSSB'
 REGISTRATION_URL = 'https://oscar.gatech.edu/bprod/bwskfreg.P_AltPin' # will redirect to term selection if needed
 QUERY_URL = 'https://oscar.gatech.edu/bprod/bwckschd.p_disp_detail_sched?term_in={term:n}&crn_in={crn:n}' # use .format
@@ -18,80 +15,26 @@ auth_dict = {'push': 0, 'call': 1, 'pass': 2} # i know there are better ways
 # https://docs.python.org/3/library/argparse.html#the-add-argument-method
 parser = argparse.ArgumentParser(description='Monitor course(s) status and register or waitlist when available.')
 parser.add_argument('crns', metavar='C', type=str, nargs='+', help='a five-digit Course Registration Number')
-parser.add_argument('--username', '--user', required=True, help='your GaTech username, e.g. gburdell0')
+parser.add_argument('--username', '--user', required=True, help='your GaTech username, e.g. gburdell0@gatech.edu')
 parser.add_argument('--password', '--pass', required=True, help='your GaTech password (don\'t worry, it won\'t be saved)')
 parser.add_argument('--authentication', '--auth', choices=['push', 'call', 'pass'], default='push', help='type of two-factor authentication to use')
-parser.add_argument('-w', '--waitlist', action='store_true', help='attempt to waitlist if possible')
-parser.add_argument('-s', '--show', action='store_true', help='show browser session in new window')
 parser.add_argument('-t', '--term', help='term code in the form YYYYSS with Spring=02, Summer=05, Fall=08 (e.g. Spring 2021 is 202102)')
 
-
-def keepActive():
-	if 'https://oscar.gatech.edu/bprod/bwskfreg.P_AltPin' in driver.current_url: # registration page
-		driver.find_element_by_xpath("//form/input[21]").click() # reset (clear CRN fields)
-	else:
-		print('WARNING: trying to keep unknown page active')
-
-def register(driver, crn, waitlist=True, field_index=0):
-	'''attempts to register for a specific course'''
-	# for i, crn in enumerate(sys.argv[1:], 1): # enumerate from index 1
-	
-	# TODO error handling (if full and/or waitlistable)
 
 def main():
 	args = parser.parse_args(sys.argv[1:]) # omit program name (sys.argv[0]) from args
 
-	options = webdriver.ChromeOptions()
-	options.add_argument('start-maximized' if args.show else 'headless')
-	anonDriver = webdriver.Chrome(CHROMEDRIVER_PATH, options=options)
-	anonDriver.implicitly_wait(3)
-	driver = webdriver.Chrome(CHROMEDRIVER_PATH, options=options)
-	driver.implicitly_wait(3)
-	
-	driver.get(LOGIN_URL)
-	driver.find_element_by_id('username').send_keys(args.username)
-	driver.find_element_by_id('password').send_keys(args.password)
-	driver.find_element_by_xpath('//*[@id="login"]/div[5]/input[4]').click()
-	driver.switch_to.frame(driver.find_element_by_id('duo_iframe'))
-	div_auth = driver.find_element_by_id("auth_methods")
-	div_auth.find_elements_by_xpath('//button[@type=\'submit\']')[auth_dict[args.authentication]].click()
-	driver.switch_to.default_content()
-	print(args.authentication.capitalize(), 'authentication requested. Please verify login attempt.')
-	WebDriverWait(driver, timeout=30).until(lambda d: d.find_elements_by_name('StuWeb-MainMenuLink'))
-	print('Logged in.')
-	
-	if term_code := args.term: # if a term code was included as an argument from command line
-		driver.get(REGISTRATION_URL + '?term_in=' + term_code) # go straight to semester registration
-	else:
-		driver.get(REGISTRATION_URL)
-		combobox = driver.find_element_by_id('term_id')
-		for option in combobox.find_elements_by_tag_name('option'): # traverse dropdown
-			if not ('View only' in option.text or 'Language' in option.text):
-				option.click() # select latest valid semester
-				driver.find_element_by_xpath('//form/input').click() # submit
-				term_code = option.get_attribute('value')
-	print('Assuming term', term_dict[term_code[4:]], term_code[:4], '.')
+	with requests.Session() as s:
+		payload = {
+			'username': args.username,
+			'password': args.password,
+			#'execution': 'e29337c6-1b58-4d11-961c-db57ca3685b2_ZXlKaGJHY2lPaUpJVXpVeE1pSXNJblI1Y0NJNklrcFhWQ0o5LnkwT2xSQUpOM2pRTy1pZGQ3VWhjMU9LUGdQOGxuY2pGNElIQ2FhVzNRcXlFd2NoV2M0UkN6MDZfczRPbWtFT0ZfdU1YRmVSa0MzMi0wNktqVGxFNmNwZU82ODJ5eU9qQ2twUVVfLUVtTTRfWG93cjg2M011RFdCVWo1UzhKUkk3VnZLNlY2UW5rYmk5N3NVX2xwQWRSQW14WEVqTkk2YWhzVmxWOEQyY0h2cWt6M1BHd3FQck83X2hqVERISkJaRlRSeU5FWkJSRHhHZzA5SVRzTXJwS2hlVUN5Umo5Sm9jbjJqeTA4ekhsUDRJZGt4cjNmWVFoUkJ2VVduRmFtV0RVcHJOM2c4RlN2WURlc1NXX2Z1YXlqaXBWV0llQVExRXdVVVJ6aGJhS3lkOTFsOU1WelRYWk1ndHdLWmVhYV9PY0luMTRReUMwSGw0RHdLMnVCNU5Wa2J3bmdxeldVd0ZhSVNtczZSTHlKbk4xQWNyM2tqRm02Z25OeTNxZGN3bHlIOGFSOHFLRVFOY3pyREl0YjJPWjQ4cmNoZzdLWEk3anZpRWlvbUptSDBTNjFDNnFWZTRxSWNrVUtNd2Z4bGFjaXRkaE5zRnhtQm40dFBhNndwbUF6cEJoQ0NsMFhFWHFhUzd5M1pmNURXay1pOTMxaWpkSjQteEJ6dlpSVlFKY0ZEdU9KbUo5Q1NZZENQS185Y1QwQnRqaHlJdFZoaFdHanVMaDc2NEdWakdjMFZ1OGN0NUtmY3JtQlNOZmNaZ0ZEOEFfeno5UXRDNG9iLWFQNjBtSUdMWVpDYkg3NHM1V1VkVm1JUkl1LUFBTTdlZ2F3X0gxUUF6aTQ0ZDNNLVN6LVotYjR4NFU5dTExUVZSZUpWeEFWeXFfRUtHRG02bnpKSE9RSnlNejNZR29Xdnl2VWlRUmQxeFM4V2RCeUNKSjFGYnVZeUFZOW9lZlVXb0I5WDBsVzJLZEphQk1xSXVVV2NIMkZpUzEyMllaVWtNMHNDbmExelgtcTl2Znp1cGpvZlJhckRqMm9HcG9rOU1xV2tBNXRadzlXWUpGeGlaeWpTaUdKTzhycEx6aGlqZlJQSnVrTDhORXp0OWtOVkJqUzVsVHV3UkFMSTFRY2JHczAtZWM4SVBvandnTkNyLVA2UUdDcEkwMXVOelBPeE8xb2dKalRTTTE2b2NKTHduLUVMSDNPbTl4TTVDVWVnWEVQNTktcll4X3ZRR0Y0NzZBb0p2OTVodHJkSThFSU5UWFI5NUVWd0JZMDFIMjhtM2thaDFtbXV0WlZGM3FLdkZqMlI4Q0wxeUlZaVphaXdhX29xSFlHOERMcWFrLXcwVFBPU2F0V3Fvdm40TmIwbkczUHZNVUw1NmlsNEswTDRLZDF0VXprOFpieWp0ZmQtUEJyOGVjYVp6alQwc0RSd2ZPcWVsd2tfUVZRWElEclBzWHd5bEtETTYxclVCbEpaV2VPRGhKd1laY293U29mbENHcnpJNWZYTVp0VXlhNzNuOXJZZ0JwUklISzB6MHh2YnV4c0hhb1c5UGlxdWMxY09FbDk1LWhlWFRCU1kzYkUtNlFMM3A1dWRIR0h6eE52X24tX2hZQ1RFMXUyb0tOLWVNcnNVbC10bG5zbDlWZTdfOF9qWWduREVJVmlwZnR5WEVhbmtSdWc0U0RWbldXRWE0ODhvOHNNQVROZW52YjlqSWliR2FPMjl5ZGZmSU5Pd0llSlJfTVVrQS12YTAzaktubHMtLThnMmdKX1NDYU1QS25JZ25Nakhwb3VJT2JiVzVEUDl0WElIczFhUzh6VFVGRnJmTkZxdGRUNVpkTE01T3YwRnJucWh3NVNEU2Z1TEJVX21vRWt1TFNWQnJnXzI5aFF2UzdKU1R1ZlU2bmZXNTVBVS03MmQ2NUNWNm93WkVuLTZ1OTN6WG9aaGNmMXZTRVpKb2k0UEdkMEE0cnVxZXVxRVlLSmJUamhyZklWVHRIR0Izak1BNC1SdC1kNkh6bjd5OFl3ZmxqUDBEeWVZb1NZb2xvdDBWeWJQM1dyWWVvQlVZeHd0MVpiRDZKYkNFNy1yV1dfanhQYmJfYlAwSEN6djJIaTRGMDhZQ1A3ZF8waDFjTU1EeXp3TUllSXVDWExyd3VPTHdfdDl4MHcyUWFPRjh1bENJYWFEZnBnblZWR054OUNJd2oydHRVbXhUSUhhTTZiZnA4QXlVYzM1YnZhMnZXeGcwWXRsNGV1eXJnU1hGNjZTUjdsaENSYzBuSGtsWHA4c3EzTm5pLU9iQlAxMGMwdk9sYVFTdHYtbEtLb2tTMkY0V2stQ0N5Y1ZtUTEwM0JRbTNaQzU2aUthTXgtSXBEOGRXM2Q1U0Rmb2R5TVhYZ1lQQjNseXo2MjgySlFfR1dPMl9ud1E5bVVldTdCQlJBcmJVVVJzUXA3QUVfV3VsVFJhOGlZNXc1cVlnLTkwQnFrYllZOXVzb0xKbUE0V0ZabGt4QzhWMlJ6U1FBZm8yMnJ1cHdta3p1Z1ZyRW5zVXN5cm9MVzRmNDcybjA0Nmc5OER3U1dqTlh5eHFqZlZqSkhWQjFNcHR3UTl3MG1JQmhIMGlwMUpfblVRWjkyOTFmck9RcWRhT3E4UDBpSk5nWmhuam1TNVpkeEtZb1pVR0szYUEwcWRGcFJpZjVJR2x6eTc1LXpNUk01bWxKQzRXMUNlWTZRY1dSc0JZZy1WUGNvNE92aXBSQzlhdUtZcksxVVhhNW1qM3BTS0w0eUdjLU9jQ3RJaFZfVEI2LUtkQmJHTlhUUXJqYjFkUXhjNy00ZzIxYlVoLXRCYV9DQUhfZzBkU2t3RG81VDk5eWk4NXJ2Vl9vUUxreXVMdE1BTTNEenNjb0ROcWVndC1VX2Y1UGNlb0V6U0VGSjdRdV92S0pvT0hMQUV2MzJ3ZUlJX3VhYnM2d0l4ZUhqNnI5aERCVTdHaUZQZlJ1SkJobDF2ZXJJMXJJODBIc1k2Vkh5UllCeC1KVDFPcHdybGNGcEdUY3hJcXZ1eE1nckkxWmp6ak9oU0JyaUlXR094VWg4RVRiWDhmY01ORktKQTNpY29lUnM4NDlqRHhrb0ZRNlZoNkFpTDFZc3hSamRfZ29UQ1pIZzRCbWtiRHd4NmZUdm01ZE5rbGhVcEdQMVQwU0p5WndRZGltaEs4SGpYRlRHQmd1NXJ5cUNkVWRUUzl1MDV2UHVETGRCV05JZU4xNlMwSGxKUmxUNzJZVHB2ODNWX1E1WDlhclFidnNDS0poNjRnODlaTGdOTkl6Z3pzeXNMOEFwWTRuMW1YTGwxTzlJQWgtUmNDUHBFNXhiSFBZeWFyVjBqZklPTmpxU2VjYTh1Nk0zVjRhZHZDWEI0dFJpSVJBMmk4b2tUUndlSzBkaEYtbkJteDNZSVNSTWNVTW1OeGdaQVF0LTFReDl5NVJjV2VPYnBlUzB2eDJ0ZWgxNXJmdlpsaEU1UVI5RF8xbFdtTGhnbjJOUElUMTBWazRrdUROQlhIUGVYMzZpTV9GN3lJUkFIWHJENXhmSnk2bWRZOVpSQ0dvaGwtMnUxb1gtNzdYYzhiLXgyWDlxaDVwVlpYSUFXcUhBQ3JMbzc2NGtWSVZBbHBpOEVpS0JLZzJsTzV4LXBxTEhVRHk4dWRQSE1TaW8xRjBjS1FFUmxwQWNPT2xMR0hIbEtya1hGallxM3RQZ2QxbEtDendaR3JEalRvWXoySEJaWkRiaXc1VFptN2c4emtKbUg1SE5YY1I4RzQ4c0JWUnRDeUJQTjdzQlpORHl5UWRRY2hXdTBWaWo2dldSZTZJWktIOVQtRlF0ZW5vQ2hWUkRPNGNFcDdmeHdlTnVmekM5UnpvNDQyQkx6ZGc1TlpYVlRucFktMWlEQjkzZEw0ZnVwMXAzbDY2UllzT1lUcG9VaTdiaE1sTFpyX1F5Sy1XdjRiZDZ5bHJVRGdXTDJBX3ZHelpFeDhXeU5mZC12aVVlVm9Ma2swZDZ3RTJiZVVYUjF1YXlxZmt4WndwOG1LakFNTUF4YXgwVUVHci0wRklOY2FPT1VpU0MwOUhWdGdvZVlnczBRaEVxZ1VibTBDcEhadnhkN1NWUlJ5eUlfeXlQVkJWdnNTcFlxOFJ5aEM0eXJSaVBsYm5UNzdSdlllLUF6WEdQMkt3dmxEX2tOZXRUODlqWDdTT0poWU9aS0FfNXdfX3lJZXRvb2ZJQlBVUkpOem5neXc1YXIwbEt5bHFOR3JZQmNHZ0NPcm50QURROVdZOF9INFlUQlZkR3d5cmlyS3FtY0w0Ym4tZkdGYTJwLXh2dWpneEhLOWpSSVUtZnFMN1ZGMnZrZ01IWEhhWUFQcTA0YVltZ2RBRThwaXBDaEhDbTVpQUhvblBuS0RpOW5OMTNzNzlDLTI2YXFfblZscnFJWkhCb2FqQnNkRFVUbzBpektDaF9GZWpjaDFPVDRGU1hmZUpUWXB1WllOYlhwdTV3NmhwM3ZQeEhENlJBLkwxRlIwcXh5UnptZTgxSUtWeU03eDdsT2t2YmdPRHljUDJpWEN0cDR5QnB1ZHN3a2pTTm5tclBMTl9kTVJSQ2RSWVpBN3p0X09WRE85R0hKcU1wQW9R',
+			'_eventId': 'submit'
+		}
+		p = s.post(LOGIN_URL, data=payload)
+		print(p.text)
 
-	driver.execute_script("window.open('');") # open new tab for querying
-	while True:
-		driver.switch_to_window(driver.window_handles[1]) # switch to second tab
-		if driver.title is not '':
-			
-		for crn in args.crns:
-			# TODO handle when 2 crns must be reigstered simultaneously
-			driver.get(QUERY_URL.format(term_code, crn))
-			# read seats available
 
-			if seats_rem > 0 or waitlist_rem > 0: # todo check this is how it's displayed
-				# TODO attempt to register
-				# switch tabs
-				driver.find_element_by_id('crn_id' + str(field_index + 1)).send_keys(crn) # add CRN
-				driver.find_element_by_xpath("//form/input[19]").click() # submit changes
-				# TODO check if registration worked, handle accordingly
-
-		time.sleep(2)
-
-	driver.quit()
 
 
 if __name__ == '__main__':
