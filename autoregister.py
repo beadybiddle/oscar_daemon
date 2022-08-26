@@ -72,22 +72,18 @@ def main():
 				term_code = option.get_attribute('value')
 	print('Assuming term', term_dict[term_code[4:]], term_code[:4], '.')
 
-	driver.execute_script("window.open('');") # open new tab for querying
 	while True:
-		driver.switch_to_window(driver.window_handles[1]) # switch to second tab
-		if driver.title is not '':
-			
-		for crn in args.crns:
-			# TODO handle when 2 crns must be reigstered simultaneously
-			driver.get(QUERY_URL.format(term_code, crn))
-			# read seats available
+		# for crn in args.crns:
+		# 	# TODO handle when 2 crns must be reigstered simultaneously
+		# 	driver.get(QUERY_URL.format(term_code, crn))
+		# 	# read seats available
 
-			if seats_rem > 0 or waitlist_rem > 0: # todo check this is how it's displayed
-				# TODO attempt to register
-				# switch tabs
-				driver.find_element_by_id('crn_id' + str(field_index + 1)).send_keys(crn) # add CRN
-				driver.find_element_by_xpath("//form/input[19]").click() # submit changes
-				# TODO check if registration worked, handle accordingly
+		# 	if seats_rem > 0 or waitlist_rem > 0: # todo check this is how it's displayed
+		# 		# TODO attempt to register
+		# 		# switch tabs
+		# 		driver.find_element_by_id('crn_id' + str(field_index + 1)).send_keys(crn) # add CRN
+		# 		driver.find_element_by_xpath("//form/input[19]").click() # submit changes
+		# 		# TODO check if registration worked, handle accordingly
 
 		time.sleep(2)
 
